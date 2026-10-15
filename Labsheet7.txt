@@ -1,0 +1,219 @@
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
+
+Database? db;
+
+Future<void> initDB() async {
+  db = await openDatabase(
+    join(await getDatabasesPath(), 'student.db'),
+    version: 1,
+    onCreate: (db, version) async {
+      await db.execute(
+        'CREATE TABLE students(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+        'name TEXT, roll INTEGER, course TEXT)'
+      );
+    },
+  );
+}
+
+Q1. Create database
+-------------------
+await initDB();
+print('Database created successfully');
+
+Q2. Create students table
+-------------------------
+// The table is created inside initDB() using CREATE TABLE.
+await initDB();
+print('Students table created');
+
+Q3. Insert record
+-----------------
+await db!.insert('students', {
+  'name': 'Puja', 'roll': 101, 'course': 'BCA'
+});
+
+Q4. Insert using TextField
+--------------------------
+// Declare controllers in your State class:
+// final nameController = TextEditingController();
+// final rollController = TextEditingController();
+// final courseController = TextEditingController();
+
+await db!.insert('students', {
+  'name': nameController.text,
+  'roll': int.parse(rollController.text),
+  'course': courseController.text,
+});
+
+Q5. Insert using rawInsert()
+----------------------------
+await db!.rawInsert(
+  'INSERT INTO students(name,roll,course) VALUES(?,?,?)',
+  ['Puja', 101, 'BCA'],
+);
+
+Q6. Display using query()
+-------------------------
+final data = await db!.query('students');
+print(data);
+
+Q7. Display using rawQuery()
+----------------------------
+final data = await db!.rawQuery('SELECT * FROM students');
+print(data);
+
+Q8. Update record
+-----------------
+await db!.update(
+  'students', {'name': 'Rahul'},
+  where: 'id = ?', whereArgs: [1],
+);
+
+Q9. Delete one record
+---------------------
+await db!.delete(
+  'students', where: 'id = ?', whereArgs: [1],
+);
+
+Q10. Clear all records
+----------------------
+await db!.delete('students');
+
+Q11. Search by roll number
+--------------------------
+final data = await db!.query(
+  'students', where: 'roll = ?', whereArgs: [101],
+);
+print(data);
+
+Q12. Filter by course
+---------------------
+final data = await db!.query(
+  'students', where: 'course = ?', whereArgs: ['BCA'],
+);
+print(data);
+
+Q13. Sort by name
+-----------------
+final data = await db!.query(
+  'students', orderBy: 'name ASC',
+);
+print(data);
+
+Q14. Count records
+------------------
+final result = await db!.rawQuery(
+  'SELECT COUNT(*) AS total FROM students',
+);
+print(result.first['total']);
+
+Q15. Student model
+------------------
+class Student {
+  final int? id;
+  final String name, course;
+  final int roll;
+
+  Student({this.id, required this.name,
+    required this.roll, required this.course});
+
+  Map<String, dynamic> toMap() => {
+    'id': id, 'name': name, 'roll': roll, 'course': course,
+  };
+
+  factory Student.fromMap(Map<String, dynamic> m) => Student(
+    id: m['id'], name: m['name'],
+    roll: m['roll'], course: m['course'],
+  );
+}
+
+Q16. Database helper
+--------------------
+class DatabaseHelper {
+  Future<int> insert(Map<String, dynamic> data) =>
+      db!.insert('students', data);
+
+  Future<List<Map<String, dynamic>>> read() =>
+      db!.query('students');
+
+  Future<int> update(int id, Map<String, dynamic> data) =>
+      db!.update('students', data,
+        where: 'id = ?', whereArgs: [id]);
+
+  Future<int> delete(int id) =>
+      db!.delete('students',
+        where: 'id = ?', whereArgs: [id]);
+}
+
+Q17. Student Record Management App (main.dart)
+----------------------------------------------
+import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
+
+void main() => runApp(const MaterialApp(home: StudentApp()));
+
+class StudentApp extends StatefulWidget {
+  const StudentApp({super.key});
+  @override
+  State<StudentApp> createState() => _StudentAppState();
+}
+
+class _StudentAppState extends State<StudentApp> {
+  Database? db;
+  List<Map<String, dynamic>> students = [];
+
+  @override
+  void initState() {
+    super.initState();
+    initDB();
+  }
+
+  Future<void> initDB() async {
+    db = await openDatabase(
+      join(await getDatabasesPath(), 'student.db'),
+      version: 1,
+      onCreate: (db, v) => db.execute(
+        'CREATE TABLE students(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+        'name TEXT, roll INTEGER, course TEXT)',
+      ),
+    );
+    loadData();
+  }
+
+  Future<void> loadData() async {
+    students = await db!.query('students', orderBy: 'id DESC');
+    if (mounted) setState(() {});
+  }
+
+  Future<void> addStudent() async {
+    await db!.insert('students', {
+      'name': 'Puja', 'roll': 101, 'course': 'BCA'
+    });
+    loadData();
+  }
+
+  Future<void> deleteStudent(int id) async {
+    await db!.delete('students', where: 'id=?', whereArgs: [id]);
+    loadData();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Student Records')),
+    floatingActionButton: FloatingActionButton(
+      onPressed: addStudent, child: const Icon(Icons.add),
+    ),
+    body: ListView(
+      children: students.map((s) => ListTile(
+        title: Text(s['name']),
+        subtitle: Text('${s['roll']} - ${s['course']}'),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete),
+          onPressed: () => deleteStudent(s['id']),
+        ),
+      )).toList(),
+    ),
+  );
+}
